@@ -1,0 +1,129 @@
+#include <BLEDevice.h>
+#include <BLEUtils.h>
+#include <BLEBeacon.h>
+#include <BLEAdvertising.h>
+
+#define BEACON_UUID "2D7A9F0C-E0E8-4CC9-A71B-A21DB2D034A1"
+
+BLEAdvertising *pAdvertising;
+BLEBeacon oBeacon;
+
+void updateBeacon(int txPowerLevel, int signalPower) {
+  BLEDevice::setPower((esp_power_level_t)txPowerLevel);
+
+  oBeacon.setSignalPower(signalPower);
+
+  BLEAdvertisementData advertisementData;
+  advertisementData.setFlags(0x04); // BR_EDR_NOT_SUPPORTED
+  //advertisementData.setName("CGU_Beacon");
+
+  String strServiceData = "";
+strServiceData += (char)26;
+strServiceData += (char)0xFF;
+strServiceData += oBeacon.getData();
+advertisementData.addData(strServiceData);
+
+  pAdvertising->stop();
+  pAdvertising->setAdvertisementData(advertisementData);
+  pAdvertising->start();
+
+  Serial.print("Updated Tx Power: ");
+  Serial.print(txPowerLevel);
+  Serial.print(", Signal Power (RSSI @ 1m): ");
+  Serial.println(signalPower);
+}
+
+void setup() {
+  Serial.begin(115200);
+  Serial.println("Starting dynamic iBeacon...");
+
+  BLEDevice::init("ESP32_Dynamic_Beacon");
+
+  oBeacon.setManufacturerId(0x004C);
+  oBeacon.setProximityUUID(BLEUUID(BEACON_UUID));
+  oBeacon.setMajor(100);
+  oBeacon.setMinor(1);
+  oBeacon.setSignalPower(-59);  // Default
+
+  pAdvertising = BLEDevice::getAdvertising();
+  pAdvertising->setScanResponse(false);
+  pAdvertising->setMinPreferred(0x06);
+  pAdvertising->setMaxPreferred(0x12);
+
+  updateBeacon(ESP_PWR_LVL_P3, -59);  // Start with default values
+
+  Serial.println("========= Dynamic iBeacon Control =========");
+Serial.println("Enter values in the format: <txLevel 0-7> <signalPower>");
+Serial.println("Example: 4 -65");
+Serial.println("-------------------------------------------");
+Serial.println("Tx Levels Meaning:");
+Serial.println("  0: Ultra Low (~1m)");
+Serial.println("  1: Very Short (~2–3m)");
+Serial.println("  2: Short (~5m)");
+Serial.println("  3: Medium (~6–8m)");
+Serial.println("  4: Medium-High (~10m)");
+Serial.println("  5: Long (~15–20m)");
+Serial.println("  6: Extended (~25–30m)");
+Serial.println("  7: Max Range (~40–50m)");
+Serial.println("===========================================\n");
+
+}
+
+//void loop() {
+//  if (Serial.available()) {
+//    String input = Serial.readStringUntil('\n');
+//    input.trim();
+//
+//    // Expected format: <txPowerLevel> <signalPower>
+//    // Example: 4 -65
+//    int spaceIdx = input.indexOf(' ');
+//    if (spaceIdx > 0) {
+//      int txLevel = input.substring(0, spaceIdx).toInt();
+//      int sigPower = input.substring(spaceIdx + 1).toInt();
+//
+//      // Clamp txLevel to valid enum range (0-7 for ESP32)
+//      if (txLevel >= 0 && txLevel <= 7) {
+//        updateBeacon(txLevel, sigPower);
+//      } else {
+//        Serial.println("Invalid Tx level (0-7 allowed).");
+//      }
+//    } else {
+//      Serial.println("Usage: <txLevel 0-7> <signalPower RSSI e.g., -65>");
+//    }
+//  }
+//}
+
+void loop() {
+  if (Serial.available()) {
+    String input = Serial.readStringUntil('\n');
+    input.trim();
+
+    int txLevel = input.toInt();
+
+    // Map 0-7 to realistic RSSI and distance (approximate)
+    if (txLevel >= 0 && txLevel <= 7) {
+      int signalPower;
+      String distance;
+
+      switch (txLevel) {
+        case 0: signalPower = -75; distance = "~1 meter"; break;
+        case 1: signalPower = -72; distance = "~2 meters"; break;
+        case 2: signalPower = -68; distance = "~4 meters"; break;
+        case 3: signalPower = -65; distance = "~7 meters"; break;
+        case 4: signalPower = -62; distance = "~10 meters"; break;
+        case 5: signalPower = -59; distance = "~15 meters"; break;
+        case 6: signalPower = -56; distance = "~20 meters"; break;
+        case 7: signalPower = -52; distance = "~30+ meters"; break;
+      }
+
+      updateBeacon((esp_power_level_t)txLevel, signalPower);
+
+      Serial.print("You selected power level ");
+      Serial.print(txLevel);
+      Serial.print(" → Estimated range: ");
+      Serial.println(distance);
+    } else {
+      Serial.println("Invalid input. Enter a power level from 0 to 7.");
+    }
+  }
+}

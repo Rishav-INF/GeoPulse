@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">GeoPulse</string>
+    <string name="default_web_client_id">114134085293-vm6s0d8l9jpibn0le96ot183cibl17np.apps.googleusercontent.com</string>
+    <string name = "maps">APNA API DAAL</string>
+</resources>
